@@ -1,10 +1,12 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { after, before, test } = require("node:test");
+const { DatabaseSync } = require("node:sqlite");
 const { createApp } = require("./server");
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "goshen-farm-test-"));
@@ -155,4 +157,133 @@ test("serves the app and clears the session on logout", async () => {
   assert.equal(logout.response.status, 200);
   cookie = null;
   assert.equal((await api("/api/inventory")).response.status, 401);
+});
+
+test("registers customers, protects staff access, and tracks pickup orders", async () => {
+  const registration = await api("/api/register", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "Farm customer",
+      email: "customer@example.com",
+      password: "customer-password-long"
+    })
+  });
+  assert.equal(registration.response.status, 201);
+  assert.equal(registration.data.user.role, "customer");
+  cookie = registration.response.headers.get("set-cookie").split(";")[0];
+
+  const products = await api("/api/products");
+  assert.equal(products.response.status, 200);
+  assert.equal(products.data.products.length, 2);
+  assert.equal(products.data.products[0].sku, undefined);
+  assert.equal(products.data.products[0].lowStockThreshold, undefined);
+  assert.equal((await api("/api/inventory")).response.status, 403);
+  assert.equal((await api("/api/reports")).response.status, 403);
+  assert.equal((await api("/api/staff", { method: "POST", body: JSON.stringify({}) })).response.status, 403);
+
+  const firstOrder = await api("/api/orders", {
+    method: "POST",
+    body: JSON.stringify({ lines: [{ productId: products.data.products.find((item) => item.name === "Organic carrots").id, quantity: 2 }] })
+  });
+  assert.equal(firstOrder.response.status, 201);
+  assert.equal((await api("/api/orders")).data.orders[0].status, "Pending");
+  const customerCookie = cookie;
+
+  const adminLogin = await api("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "owner@example.com", password: "test-password-long-enough" })
+  });
+  assert.equal(adminLogin.data.user.role, "admin");
+  cookie = adminLogin.response.headers.get("set-cookie").split(";")[0];
+
+  const staffCreated = await api("/api/staff", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "Farm staff",
+      email: "staff@example.com",
+      password: "staff-password-long-enough"
+    })
+  });
+  assert.equal(staffCreated.response.status, 201);
+  assert.equal((await api("/api/staff")).data.staff[0].email, "staff@example.com");
+
+  const staffLogin = await api("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ email: "staff@example.com", password: "staff-password-long-enough" })
+  });
+  assert.equal(staffLogin.data.user.role, "staff");
+  cookie = staffLogin.response.headers.get("set-cookie").split(";")[0];
+  assert.equal((await api("/api/summary")).response.status, 200);
+  assert.equal((await api("/api/staff")).response.status, 403);
+  assert.equal((await api("/api/staff", { method: "POST", body: JSON.stringify({}) })).response.status, 403);
+  assert.equal((await api("/api/orders")).data.orders[0].customerEmail, "customer@example.com");
+
+  const completed = await api("/api/orders/" + firstOrder.data.order.id, {
+    method: "PUT",
+    body: JSON.stringify({ status: "Completed" })
+  });
+  assert.equal(completed.response.status, 200);
+  const completedSummary = await api("/api/summary");
+  assert.equal(completedSummary.data.totalRevenueCents, 1500);
+
+  cookie = customerCookie;
+  assert.equal((await api("/api/orders")).data.orders[0].status, "Completed");
+  assert.equal((await api("/api/sales")).response.status, 403);
+  const nextOrder = await api("/api/orders", {
+    method: "POST",
+    body: JSON.stringify({ lines: [{ productId: products.data.products.find((item) => item.name === "Organic carrots").id, quantity: 1 }] })
+  });
+  assert.equal(nextOrder.response.status, 201);
+  assert.equal((await api("/api/summary")).response.status, 403);
+
+  cookie = staffLogin.response.headers.get("set-cookie").split(";")[0];
+  const cancelled = await api("/api/orders/" + nextOrder.data.order.id, {
+    method: "PUT",
+    body: JSON.stringify({ status: "Cancelled" })
+  });
+  assert.equal(cancelled.response.status, 200);
+  assert.equal((await api("/api/inventory")).data.items.find((item) => item.name === "Organic carrots").quantity, 4);
+  assert.equal((await api("/api/summary")).data.totalRevenueCents, 1500);
+});
+
+test("migrates existing accounts and sales without changing their records", () => {
+  const legacyDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "goshen-legacy-test-"));
+  const legacyPath = path.join(legacyDirectory, "legacy.db");
+  const legacyDb = new DatabaseSync(legacyPath);
+  const salt = crypto.randomBytes(16);
+  const passwordHash = crypto.scryptSync("legacy-password-long", salt, 64);
+  legacyDb.exec(`
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash BLOB NOT NULL,
+      password_salt BLOB NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE sales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer TEXT NOT NULL DEFAULT '',
+      payment_method TEXT NOT NULL,
+      total_cents INTEGER NOT NULL CHECK(total_cents >= 0),
+      created_at TEXT NOT NULL
+    );
+  `);
+  legacyDb.prepare("INSERT INTO users (email, password_hash, password_salt, created_at) VALUES (?, ?, ?, ?)")
+    .run("legacy-admin@example.com", passwordHash, salt, new Date().toISOString());
+  legacyDb.prepare("INSERT INTO sales (customer, payment_method, total_cents, created_at) VALUES (?, ?, ?, ?)")
+    .run("Walk-in", "Cash", 500, new Date().toISOString());
+  legacyDb.close();
+
+  const migratedApp = createApp({ dbPath: legacyPath, logger: null });
+  try {
+    assert.equal(migratedApp.adminCredentials, null);
+    const migratedUser = migratedApp.db.prepare("SELECT name, role FROM users WHERE email = ?").get("legacy-admin@example.com");
+    assert.equal(migratedUser.name, "");
+    assert.equal(migratedUser.role, "admin");
+    assert.equal(migratedApp.db.prepare("SELECT status FROM sales WHERE id = 1").get().status, "Completed");
+    assert.equal(migratedApp.db.prepare("SELECT total_cents FROM sales WHERE id = 1").get().total_cents, 500);
+  } finally {
+    migratedApp.db.close();
+    fs.rmSync(legacyDirectory, { recursive: true, force: true });
+  }
 });

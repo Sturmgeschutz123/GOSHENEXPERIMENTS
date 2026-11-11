@@ -15,7 +15,7 @@
       <div class="brand-mark" aria-hidden="true">🌱</div>
       <p class="eyebrow">GOSHEN ORGANIC FARMS</p>
       <h1>Welcome back</h1>
-      <p class="muted">Sign in to manage your farm operations.</p>
+      <p class="muted" id="auth-description">Sign in to your farm account.</p>
       <form id="login-form">
         <label for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="username" required>
@@ -24,7 +24,18 @@
         <p class="login-error" id="login-error" role="alert"></p>
         <button class="button primary full-width" type="submit">Log in</button>
       </form>
-      <p class="demo-hint">Your administrator credentials are shown in the server console on first startup.</p>
+      <form id="register-form" hidden>
+        <label for="register-name">Your name</label>
+        <input id="register-name" name="name" maxlength="80" autocomplete="name" required>
+        <label for="register-email">Email</label>
+        <input id="register-email" name="email" type="email" maxlength="254" autocomplete="email" required>
+        <label for="register-password">Password</label>
+        <input id="register-password" name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" required>
+        <p class="login-error" id="register-error" role="alert"></p>
+        <button class="button primary full-width" type="submit">Create customer account</button>
+      </form>
+      <button class="auth-switch" id="auth-switch" type="button">New here? Create a customer account</button>
+      <p class="demo-hint">Staff accounts are created by a farm administrator.</p>
     </section>
   </main>
 
@@ -36,6 +47,7 @@
       </a>
       <div class="account">
         <span id="signed-in-user"></span>
+        <strong class="role-badge" id="account-role"></strong>
         <button class="button secondary" id="logout-button" type="button">Log out</button>
       </div>
     </header>
@@ -47,7 +59,9 @@
           <button class="nav-link active" data-page="dashboard" type="button">◫ <span>Overview</span></button>
           <button class="nav-link" data-page="inventory" type="button">▤ <span>Inventory</span></button>
           <button class="nav-link" data-page="sales" type="button">↗ <span>Sales</span></button>
+          <button class="nav-link" data-page="orders" data-role="staff" type="button">▣ <span>Orders</span></button>
           <button class="nav-link" data-page="reports" type="button">▥ <span>Reports</span></button>
+          <button class="nav-link" data-page="team" data-role="admin" type="button">♙ <span>Team</span></button>
         </nav>
         <div class="sidebar-note"><span class="online-dot"></span> Local farm database</div>
       </aside>
@@ -116,6 +130,35 @@
           </section>
         </section>
 
+        <section class="page-panel" id="orders-page" hidden>
+          <section class="panel-card">
+            <div class="panel-heading"><div><h2>Customer orders</h2><p class="muted">New orders reserve stock until completed or cancelled.</p></div></div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="orders-list"></tbody></table>
+              <p class="empty-state" id="orders-empty" hidden>No customer orders yet.</p>
+            </div>
+          </section>
+        </section>
+
+        <section class="page-panel" id="team-page" hidden>
+          <div class="dashboard-grid">
+            <section class="panel-card">
+              <div class="panel-heading"><div><h2>Add a staff account</h2><p class="muted">Only administrators can create staff logins.</p></div></div>
+              <form id="staff-form" class="staff-form">
+                <label for="staff-name">Staff name</label><input id="staff-name" maxlength="80" required>
+                <label for="staff-email">Email</label><input id="staff-email" type="email" maxlength="254" required>
+                <label for="staff-password">Temporary password</label><input id="staff-password" type="password" minlength="12" maxlength="256" required>
+                <p class="form-error" id="staff-error" role="alert" hidden></p>
+                <button class="button primary" type="submit">Create staff account</button>
+              </form>
+            </section>
+            <section class="panel-card">
+              <div class="panel-heading"><div><h2>Farm staff</h2><p class="muted">Team members with operations access</p></div></div>
+              <div class="staff-list" id="staff-list"></div>
+            </section>
+          </div>
+        </section>
+
         <section class="page-panel" id="reports-page" hidden>
           <section class="panel-card report-toolbar">
             <form id="report-filter">
@@ -141,6 +184,49 @@
         <footer class="storage-note">Farm data is stored locally on this server in SQLite.</footer>
       </section>
     </div>
+  </main>
+
+  <main class="customer-app" id="customer-view" hidden>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Goshen Organic Farms home">
+        <span class="brand-mark small" aria-hidden="true">🌱</span>
+        <span>Goshen <span class="brand-light">Organic Farms</span></span>
+      </a>
+      <div class="account"><span id="customer-name"></span><span class="role-badge">Customer</span><button class="button secondary" id="customer-logout-button" type="button">Log out</button></div>
+    </header>
+    <section class="customer-content">
+      <p class="app-error" id="customer-error" role="alert" hidden></p>
+      <div class="page-heading">
+        <div><p class="eyebrow">FRESH FROM THE FARM</p><h1>Farm shop</h1><p class="muted">Browse what is in season and place an order for pickup.</p></div>
+        <button class="button primary" id="place-order-button" type="button">Place order · <span id="cart-count">0</span></button>
+      </div>
+      <nav class="customer-tabs" aria-label="Customer pages">
+        <button class="nav-link active" data-customer-page="shop" type="button">Browse products</button>
+        <button class="nav-link" data-customer-page="my-orders" type="button">My orders</button>
+      </nav>
+      <section id="shop-page" class="customer-panel">
+        <div class="panel-heading"><div><h2>Available products</h2><p class="muted">Orders are reserved for pickup. Pay when you collect.</p></div></div>
+        <div class="shop-layout">
+          <div><div class="catalog-grid" id="catalog-grid"></div><p class="empty-state" id="catalog-empty" hidden>No products are available right now.</p></div>
+          <aside class="cart-card">
+            <h2>Your order</h2>
+            <div class="cart-items" id="cart-items"></div>
+            <p class="empty-state cart-empty" id="cart-empty">Your order is empty.</p>
+            <div class="sale-total-row"><span>Order total</span><strong id="cart-total">$0.00</strong></div>
+            <p class="muted pickup-note">Pay when you pick up your order.</p>
+          </aside>
+        </div>
+      </section>
+      <section id="my-orders-page" class="customer-panel" hidden>
+        <div class="panel-card">
+          <div class="panel-heading"><div><h2>My orders</h2><p class="muted">Track your orders and pickup status.</p></div></div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Date</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody id="customer-orders-list"></tbody></table>
+            <p class="empty-state" id="customer-orders-empty" hidden>You have not placed any orders yet.</p>
+          </div>
+        </div>
+      </section>
+    </section>
   </main>
 
   <dialog id="item-dialog">
