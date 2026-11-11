@@ -36,6 +36,7 @@
       </a>
       <div class="account">
         <span id="signed-in-user"></span>
+        <strong id="account-role"></strong>
         <button class="button secondary" id="logout-button" type="button">Log out</button>
       </div>
     </header>
@@ -61,7 +62,7 @@
         <div class="inventory-heading">
           <div>
             <h2>All items</h2>
-            <p class="muted">Your current farm stock</p>
+            <p class="muted" id="inventory-description">Your current farm stock</p>
           </div>
           <label class="search-label" for="search">Search inventory</label>
           <input class="search" id="search" type="search" placeholder="Search items..." autocomplete="off">

@@ -20,6 +20,7 @@
   var editingId = null;
   var activeUserId = null;
   var inventoryLoaded = false;
+  var isAdmin = false;
 
   function showLoginError(message) {
     loginError.textContent = message;
@@ -41,24 +42,52 @@
 
   function showLogin() {
     activeUserId = null;
+    isAdmin = false;
     inventoryLoaded = false;
     items = [];
     inventoryView.hidden = true;
     loginView.hidden = false;
     loginForm.reset();
+    document.getElementById("account-role").textContent = "";
+    document.getElementById("inventory-description").textContent = "Your current farm stock";
   }
 
-  function showInventory(user) {
+  async function showInventory(user) {
     loginView.hidden = true;
     inventoryView.hidden = false;
     document.getElementById("signed-in-user").textContent = user.email || "";
 
     if (activeUserId !== user.id) {
       activeUserId = user.id;
+      isAdmin = false;
       items = [];
       inventoryLoaded = false;
       renderItems();
-      loadItems();
+      var roleResult;
+      try {
+        roleResult = await supabaseClient
+          .from("admin_users")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+      } catch (error) {
+        await loadItems();
+        showAppError("Could not check account role: " + getErrorMessage(error));
+        return;
+      }
+
+      if (roleResult.error) {
+        await loadItems();
+        showAppError("Could not check account role: " + getErrorMessage(roleResult.error));
+        return;
+      }
+
+      isAdmin = Boolean(roleResult.data);
+      document.getElementById("account-role").textContent = isAdmin ? "Admin" : "";
+      document.getElementById("inventory-description").textContent = isAdmin
+        ? "View and manage inventory for all users."
+        : "Your current farm stock";
+      await loadItems();
     }
   }
 
@@ -253,6 +282,9 @@
       ? items.filter(function (item) { return item.quantity <= 5; }).length
       : "—";
     document.getElementById("empty-state").hidden = !inventoryLoaded || filtered.length > 0;
+    document.getElementById("inventory-description").textContent = isAdmin
+      ? "View and manage inventory for all users."
+      : "Your current farm stock";
   }
 
   async function deleteItem(item) {
@@ -298,7 +330,7 @@
       return;
     }
     if (result.data.session) {
-      showInventory(result.data.session.user);
+      return showInventory(result.data.session.user);
     }
   }).catch(function (error) {
     showLoginError("Could not restore your session: " + getErrorMessage(error));
