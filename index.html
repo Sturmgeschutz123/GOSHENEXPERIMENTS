@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f6ef">
-  <title>Farm Inventory · Goshen Organic Farms</title>
+  <meta name="description" content="Manage Goshen Organic Farms inventory, sales, and revenue.">
+  <title>Farm operations · Goshen Organic Farms</title>
   <link rel="stylesheet" href="styles (1).css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
   <script src="script.js" defer></script>
 </head>
 <body>
@@ -15,7 +15,7 @@
       <div class="brand-mark" aria-hidden="true">🌱</div>
       <p class="eyebrow">GOSHEN ORGANIC FARMS</p>
       <h1>Welcome back</h1>
-      <p class="muted">Sign in to manage your farm inventory.</p>
+      <p class="muted">Sign in to manage your farm operations.</p>
       <form id="login-form">
         <label for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="username" required>
@@ -24,82 +24,148 @@
         <p class="login-error" id="login-error" role="alert"></p>
         <button class="button primary full-width" type="submit">Log in</button>
       </form>
-      <p class="demo-hint">Sign in with an account created for this project in Supabase.</p>
+      <p class="demo-hint">Your administrator credentials are shown in the server console on first startup.</p>
     </section>
   </main>
 
-  <main class="app" id="inventory-view" hidden>
+  <main class="app" id="app-view" hidden>
     <header class="topbar">
-      <a class="brand" href="#" aria-label="Goshen Organic Farms inventory">
+      <a class="brand" href="#" aria-label="Goshen Organic Farms home">
         <span class="brand-mark small" aria-hidden="true">🌱</span>
         <span>Goshen <span class="brand-light">Organic Farms</span></span>
       </a>
       <div class="account">
         <span id="signed-in-user"></span>
-        <strong id="account-role"></strong>
         <button class="button secondary" id="logout-button" type="button">Log out</button>
       </div>
     </header>
 
-    <section class="content">
-      <p class="app-error" id="app-error" role="alert" hidden></p>
-      <div class="page-heading">
-        <div>
-          <p class="eyebrow">FARM OPERATIONS</p>
-          <h1>Inventory</h1>
-          <p class="muted">Keep track of the products and supplies on hand.</p>
-        </div>
-        <button class="button primary" id="add-item-button" type="button">＋ Add item</button>
-      </div>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <p class="eyebrow">FARM OPERATIONS</p>
+        <nav>
+          <button class="nav-link active" data-page="dashboard" type="button">◫ <span>Overview</span></button>
+          <button class="nav-link" data-page="inventory" type="button">▤ <span>Inventory</span></button>
+          <button class="nav-link" data-page="sales" type="button">↗ <span>Sales</span></button>
+          <button class="nav-link" data-page="reports" type="button">▥ <span>Reports</span></button>
+        </nav>
+        <div class="sidebar-note"><span class="online-dot"></span> Local farm database</div>
+      </aside>
 
-      <section class="stats" aria-label="Inventory summary">
-        <article class="stat-card"><span>Total products</span><strong id="product-count">0</strong></article>
-        <article class="stat-card"><span>Units in stock</span><strong id="unit-count">0</strong></article>
-        <article class="stat-card"><span>Low stock items</span><strong id="low-stock-count">0</strong></article>
-      </section>
-
-      <section class="inventory-card">
-        <div class="inventory-heading">
+      <section class="content">
+        <p class="app-error" id="app-error" role="alert" hidden></p>
+        <div class="page-heading">
           <div>
-            <h2>All items</h2>
-            <p class="muted" id="inventory-description">Your current farm stock</p>
+            <p class="eyebrow">GOSHEN ORGANIC FARMS</p>
+            <h1 id="page-title">Dashboard</h1>
+            <p class="muted">A clear view of today's farm business.</p>
           </div>
-          <label class="search-label" for="search">Search inventory</label>
-          <input class="search" id="search" type="search" placeholder="Search items..." autocomplete="off">
+          <button class="button primary" id="add-sale-button" type="button">＋ Record a sale</button>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Item</th><th>Category</th><th>Quantity</th><th>Unit price</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr>
-            </thead>
-            <tbody id="inventory-list"></tbody>
-          </table>
-          <p class="empty-state" id="empty-state">No items yet. Add your first inventory item.</p>
-        </div>
+
+        <section class="page-panel" id="dashboard-page">
+          <div class="stats">
+            <article class="stat-card"><span>Revenue today</span><strong id="summary-today">—</strong><small id="summary-today-count">—</small></article>
+            <article class="stat-card"><span>Total revenue</span><strong id="summary-revenue">—</strong><small>All recorded sales</small></article>
+            <article class="stat-card"><span>Inventory items</span><strong id="summary-products">—</strong><small><span id="summary-units">—</span> units on hand</small></article>
+            <article class="stat-card"><span>Needs attention</span><strong id="summary-low-stock">—</strong><small>Low or out of stock</small></article>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel-card">
+              <div class="panel-heading"><div><h2>Recent sales</h2><p class="muted">The latest transactions</p></div><button class="text-button" data-page="sales" type="button">View all →</button></div>
+              <div class="table-wrap">
+                <table><thead><tr><th>Date</th><th>Customer</th><th>Total</th></tr></thead><tbody id="recent-sales-list"></tbody></table>
+                <p class="empty-state" id="recent-sales-empty" hidden>No sales recorded yet.</p>
+              </div>
+            </section>
+            <section class="panel-card highlight-card">
+              <span class="highlight-icon" aria-hidden="true">🌾</span>
+              <p class="eyebrow">A GOOD DAY'S WORK</p>
+              <h2>Grow with confidence.</h2>
+              <p class="muted">Keep your stock accurate and record each sale to see how your farm is doing.</p>
+              <button class="button secondary" data-page="reports" type="button">Explore reports</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="page-panel" id="inventory-page" hidden>
+          <div class="panel-card inventory-card">
+            <div class="inventory-heading">
+              <div><h2>All inventory</h2><p class="muted" id="inventory-count-label">Your current farm stock</p></div>
+              <label class="sr-only" for="inventory-search">Search inventory</label>
+              <input class="search" id="inventory-search" type="search" placeholder="Search items..." autocomplete="off">
+              <button class="button primary" id="add-item-button" type="button">＋ Add item</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Item</th><th>Category</th><th>On hand</th><th>Unit price</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                <tbody id="inventory-list"></tbody>
+              </table>
+              <p class="empty-state" id="inventory-empty" hidden>No matching inventory. Add your first item.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="page-panel" id="sales-page" hidden>
+          <section class="panel-card">
+            <div class="panel-heading"><div><h2>Sales history</h2><p class="muted">Recent transactions with recorded prices</p></div><button class="button primary" data-new-sale type="button">＋ New sale</button></div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Date</th><th>Customer</th><th>Items</th><th>Payment</th><th>Total</th></tr></thead><tbody id="sales-list"></tbody></table>
+              <p class="empty-state" id="sales-empty" hidden>No sales recorded yet. Record your first sale.</p>
+            </div>
+          </section>
+        </section>
+
+        <section class="page-panel" id="reports-page" hidden>
+          <section class="panel-card report-toolbar">
+            <form id="report-filter">
+              <div><label for="report-from">From</label><input id="report-from" type="date" required></div>
+              <div><label for="report-to">To</label><input id="report-to" type="date" required></div>
+              <button class="button primary" type="submit">Apply dates</button>
+              <button class="button secondary" id="download-report" type="button">Download CSV</button>
+            </form>
+          </section>
+          <div class="stats report-stats">
+            <article class="stat-card"><span>Revenue in period</span><strong id="report-revenue">—</strong></article>
+            <article class="stat-card"><span>Sales in period</span><strong id="report-sales-count">—</strong></article>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel-card"><div class="panel-heading"><div><h2>Daily revenue</h2><p class="muted">Up to the last 14 days in the selected range</p></div></div><div class="revenue-chart" id="revenue-chart" aria-label="Daily revenue bar chart"></div></section>
+            <section class="panel-card"><div class="panel-heading"><div><h2>Top products</h2><p class="muted">By revenue in selected period</p></div></div><div class="top-products" id="top-products"></div></section>
+          </div>
+          <section class="panel-card daily-table-card">
+            <div class="panel-heading"><div><h2>Daily breakdown</h2><p class="muted">Revenue and transaction count by day</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Date</th><th>Sales</th><th>Revenue</th></tr></thead><tbody id="daily-report-list"></tbody></table></div>
+          </section>
+        </section>
+        <footer class="storage-note">Farm data is stored locally on this server in SQLite.</footer>
       </section>
-      <p class="storage-note">Inventory is securely synced to your Supabase account.</p>
-    </section>
+    </div>
   </main>
 
   <dialog id="item-dialog">
-    <form id="item-form" class="item-form">
-      <div class="dialog-heading">
-        <div><p class="eyebrow">INVENTORY</p><h2 id="dialog-title">Add item</h2></div>
-        <button class="close-button" id="close-dialog" type="button" aria-label="Close">×</button>
-      </div>
-      <label for="item-name">Item name</label>
-      <input id="item-name" name="name" maxlength="60" required>
-      <label for="item-category">Category</label>
-      <input id="item-category" name="category" maxlength="40" placeholder="e.g. Produce, Supplies" required>
+    <form id="item-form" class="dialog-form">
+      <div class="dialog-heading"><div><p class="eyebrow">INVENTORY</p><h2 id="item-dialog-title">Add inventory item</h2></div><button class="close-button" id="close-item" type="button" aria-label="Close">×</button></div>
+      <label for="item-name">Item name</label><input id="item-name" name="name" maxlength="80" required>
+      <div class="form-row"><div><label for="item-sku">SKU <span class="optional">(optional)</span></label><input id="item-sku" name="sku" maxlength="40"></div><div><label for="item-category">Category</label><input id="item-category" name="category" maxlength="50" placeholder="Produce" required></div></div>
+      <div class="form-row"><div><label for="item-quantity">Quantity on hand</label><input id="item-quantity" name="quantity" type="number" min="0" step="1" required></div><div><label for="item-unit">Unit</label><input id="item-unit" name="unit" maxlength="20" value="each" required></div></div>
+      <div class="form-row"><div><label for="item-price">Unit price ($)</label><input id="item-price" name="price" type="number" min="0" step="0.01" required></div><div><label for="item-threshold">Low stock at</label><input id="item-threshold" name="lowStockThreshold" type="number" min="0" step="1" value="5" required></div></div>
       <p class="form-error" id="item-error" role="alert" hidden></p>
-      <div class="form-row">
-        <div><label for="item-quantity">Quantity</label><input id="item-quantity" name="quantity" type="number" min="0" step="1" required></div>
-        <div><label for="item-price">Unit price ($)</label><input id="item-price" name="price" type="number" min="0" step="0.01" required></div>
-      </div>
-      <div class="dialog-actions">
-        <button class="button secondary" id="cancel-dialog" type="button">Cancel</button>
-        <button class="button primary" type="submit">Save item</button>
-      </div>
+      <div class="dialog-actions"><button class="button secondary" id="cancel-item" type="button">Cancel</button><button class="button primary" type="submit">Save item</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="sale-dialog">
+    <form id="sale-form" class="dialog-form">
+      <div class="dialog-heading"><div><p class="eyebrow">SALES</p><h2>Record a sale</h2></div><button class="close-button" id="close-sale" type="button" aria-label="Close">×</button></div>
+      <label for="sale-customer">Customer <span class="optional">(optional)</span></label><input id="sale-customer" maxlength="80" placeholder="Walk-in customer">
+      <label for="sale-payment">Payment method</label><select id="sale-payment" class="field-select"><option>Cash</option><option>Card</option><option>Bank transfer</option><option>Other</option></select>
+      <div class="sale-lines-heading"><span>Product</span><span>Qty</span><span></span></div>
+      <div id="sale-lines"></div>
+      <button class="text-button add-line" id="add-sale-line" type="button">＋ Add another product</button>
+      <div class="sale-total-row"><span>Sale total</span><strong id="sale-total">$0.00</strong></div>
+      <p class="form-error" id="sale-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button class="button secondary" id="cancel-sale" type="button">Cancel</button><button class="button primary" type="submit">Save sale</button></div>
     </form>
   </dialog>
 </body>
